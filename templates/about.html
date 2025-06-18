@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>About - Automated Retinal Imaging</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Styles specific to the About page can go here if needed */
+        .about-content {
+            text-align: left;
+            line-height: 1.8;
+            color: #333;
+        }
+
+        .about-content h3 {
+            margin-top: 20px;
+            margin-bottom: 15px;
+            color: #005f99;
+            text-align: center;
+        }
+
+        .about-content p {
+            margin-bottom: 15px;
+        }
+
+        .about-content ul {
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+
+        .about-content li {
+            margin-bottom: 8px;
+        }
+
+        /* Style for the disclaimer/important notes */
+        .disclaimer {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #fff3cd; /* Light yellow background for warning */
+            border: 1px solid #ffeeba; /* Matching border */
+            border-radius: 8px;
+            color: #856404; /* Dark yellow text */
+            font-weight: 500;
+        }
+
+        .disclaimer h4 {
+            margin-top: 0;
+            color: #856404;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .disclaimer p {
+            margin-bottom: 0;
+            font-size: 1em;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <nav>
+            <div class="site-title">Automated Retinal Imaging</div>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('about') }}">About</a></li>
+                </ul>
+        </nav>
+    </header>
+
+    <h1>About This Project</h1>
+
+    <div class="container about-content">
+        <p>
+            Welcome to the About page for the Automated Retinal Imaging project. This tool is developed to demonstrate the application of machine learning in analyzing retinal fundus images for potential signs of Diabetic Retinopathy (DR).
+        </p>
+
+        <h3>Project Goal</h3>
+        <p>
+            The primary goal of this project is to provide an interactive example of how convolutional neural networks (CNNs), specifically a DenseNet121 architecture, can be trained and used for image classification tasks in a medical context. It aims to:
+        </p>
+        <ul>
+            <li>Illustrate the process of image analysis using a pre-trained model.</li>
+            <li>Showcase the integration of a machine learning model within a web application using Flask.</li>
+            <li>Demonstrate the use of explainability techniques like Grad-CAM to visualize which parts of an image the model focuses on.</li>
+            <li>Provide general information about Diabetic Retinopathy and its associated risks (cardiac, glaucoma) based on the model's output.</li>
+        </ul>
+
+        <h3>Technology Used</h3>
+        <p>
+            This project utilizes the following key technologies:
+        </p>
+        <ul>
+            <li><strong>Flask:</strong> A micro web framework for Python, used for the backend server and handling web requests.</li>
+            <li><strong>TensorFlow/Keras:</strong> An open-source machine learning library used for building and running the deep learning model (DenseNet121).</li>
+            <li><strong>OpenCV (cv2):</strong> Used for image processing tasks, including preparing images for the model and generating Grad-CAM heatmaps.</li>
+            <li><strong>NumPy:</strong> A fundamental package for scientific computing in Python, used for numerical operations on image data.</li>
+            <li><strong>HTML, CSS, JavaScript:</strong> For the frontend web interface, handling user interaction and displaying results.</li>
+             <li><strong>Google Generative AI (Gemini API):</strong> Used to provide explanatory summaries and information related to the predicted diagnoses.</li>
+        </ul>
+
+        <h3>How It Works</h3>
+        <p>
+            When you upload a retinal image, the Flask backend receives the image and passes it to the loaded DenseNet121 model. The model processes the image and outputs a prediction indicating the severity level of Diabetic Retinopathy (from 'No_DR' to 'Proliferate_DR'). The application then uses Grad-CAM to generate a heatmap highlighting the areas of the image that were most influential in the model's prediction. Finally, relevant information and an explanation are provided based on the predicted diagnosis.
+        </p>
+
+        <div class="disclaimer">
+            <h4>Important Disclaimer</h4>
+            <p>
+                This tool is built for **educational and demonstrational purposes only**. It is designed to show how machine learning can be applied to medical imaging, but it is **not a medical device** and should **not** be used for actual medical diagnosis or treatment decisions.
+            </p>
+            <p>
+                Machine learning models, including the one used here, can make mistakes. The predictions and information provided by this tool may be inaccurate. **Always consult with a qualified healthcare professional** for any health concerns, diagnosis, or treatment. Do not rely on the results of this tool for medical advice.
+            </p>
+             <p>
+                 The information provided regarding cardiac and glaucoma risks is general and based on known associations with Diabetic Retinopathy stages. It is not a substitute for a comprehensive medical evaluation.
+             </p>
+        </div>
+
+    </div>
+
+
+    <footer>
+        <p>&copy; {{ now().year }} Automated Retinal Imaging Project. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

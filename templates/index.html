@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Automated Retinal Imaging for Early Diagnosis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /*
+           Styles specific to the index page can go here if needed,
+           but most general styles are in static/style.css
+        */
+
+        /* Style for the introductory text */
+        .intro-text {
+            max-width: 800px;
+            margin: 20px auto 40px auto; /* Center and add space below */
+            font-size: 1.1em;
+            color: #555;
+            line-height: 1.8;
+            text-align: center;
+        }
+         .intro-text p {
+             margin-bottom: 15px;
+         }
+
+         /* Styles for the new Assistant Summary Blocks */
+         .gemini-summary-block { /* Kept class name for styling consistency */
+             margin-top: 20px;
+             padding: 20px;
+             background-color: #e8f0fe; /* Light blue background */
+             border: 1px solid #c6dafc; /* Matching border */
+             border-radius: 8px;
+             text-align: left;
+             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+         }
+          .gemini-summary-block h4 {
+              margin-top: 0; /* Remove top margin for block title */
+              margin-bottom: 10px;
+              color: #004085; /* Darker blue for titles */
+              text-align: left; /* Align title left */
+          }
+          .gemini-summary-block p {
+              margin-bottom: 0; /* Remove bottom margin for last paragraph */
+              font-size: 1em;
+              color: #333;
+          }
+
+         /* Styles for the Print Button - General styles moved to style.css */
+
+         /* Styles for the Upload Another Button - General styles moved to style.css */
+
+
+        /* CSS for printing - targets elements NOT inside resultsContainer */
+        /* This style block will be temporarily applied by JavaScript before printing */
+        @media print {
+            body > *:not(#resultsContainer) {
+                display: none !important; /* Hide everything that is a direct child of body, EXCEPT resultsContainer */
+            }
+
+            /* Ensure resultsContainer is visible and takes necessary space */
+            #resultsContainer {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important; /* Remove shadow for print */
+                opacity: 1 !important; /* Ensure full opacity */
+                transform: none !important; /* Remove any transforms */
+                animation: none !important; /* Remove animations */
+            }
+
+            /* Adjust margins/padding within resultsContainer for print if needed */
+            #resultsSection {
+                 padding: 0 !important; /* Remove padding from resultsSection if desired for print */
+            }
+             /* Ensure .container within resultsContainer behaves for print */
+            #resultsContainer .container {
+                 box-shadow: none !important; /* Remove container shadow for print */
+                 animation: none !important; /* Remove container animation */
+                 opacity: 1 !important;
+                 transform: none !important;
+                 margin: 10px auto !important; /* Add some margin back for print blocks */
+                 padding: 15px !important; /* Adjust padding for print */
+            }
+
+             /* Ensure images are visible and sized appropriately for print */
+             .image-wrapper img, #geminiSummarySection img, #xaiSection img { /* Also target image in summary and XAI */
+                 max-height: none !important; /* Remove max-height constraint for print */
+                 width: auto !important; /* Let images size naturally or based on print layout */
+                 max-width: 100% !important; /* Ensure images don't overflow */
+             }
+             /* Ensure flex layout works for images in print */
+             .image-container {
+                  flex-direction: row !important; /* Try row layout for print if space allows */
+                  flex-wrap: wrap !important;
+                  justify-content: center !important;
+             }
+             .image-wrapper {
+                 flex: none !important; /* Prevent flex shrinking/growing */
+                 width: auto !important; /* Let wrapper size based on content */
+                 min-width: 0 !important;
+                 max-width: 450px !important; /* Keep a max-width hint */
+                 padding: 10px !important; /* Reduce padding for print */
+                 box-shadow: none !important;
+             }
+             /* Hide buttons and feedback in print */
+             #printButton, #uploadAnotherButton, .button-group, #feedbackSection { /* Feedback section is removed, but keeping for safety */
+                 display: none !important;
+             }
+             /* Ensure XAI section is visible in print */
+             #xaiSection {
+                 display: block !important;
+             }
+        }
+
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <nav>
+            <div class="site-title">Automated Retinal Imaging</div>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('about') }}">About</a></li>
+                </ul>
+        </nav>
+    </header>
+
+    <h1>
+      Automated Retinal Imaging for Early Diagnosis
+    </h1>
+    <h2>Upload Retina Image</h2>
+
+     <div class="intro-text container"> <p>
+            Welcome to the Automated Retinal Imaging tool. This application uses a deep learning model to analyze retinal fundus images for signs of Diabetic Retinopathy and assess potential risks related to cardiac and ocular diseases.
+        </p>
+        <p>
+            Upload a retina image below to get an instant analysis. Please note this tool is for informational purposes and is not a substitute for professional medical advice.
+        </p>
+    </div>
+
+
+    <div id="uploadForm" class="container"> <input type="file" name="image" id="imageInput" accept="image/*" required /><br />
+      <button type="button" id="predictButton">Predict</button>
+    </div>
+
+    <div id="previewSection" class="container"> <h4>Selected Image Preview</h4>
+         <img id="imagePreview" src="#" alt="Image Preview" />
+     </div>
+
+
+     <div class="loader-container" id="loaderContainer" style="display: none;">
+         <div class="loader" id="loader"></div>
+         <p id="loadingMessage" class="loading-message"></p>
+     </div>
+
+
+    <div id="resultsContainer" class="container"> <div id="resultsSection">
+            <h3>Analysis Results</h3>
+            <div class="image-container">
+                <div class="image-wrapper">
+                    <h4>Uploaded Image</h4>
+                    <img id="uploadedImage" src="" alt="Uploaded Image" />
+                </div>
+                <div class="image-wrapper">
+                    <h4>Corresponding Modified Image</h4>
+                    <img id="modifiedImage" src="" alt="Modified Image" />
+                     <p id="modifiedImageNotFound" style="display: none; color: #e74c3c; font-style: italic; text-align: center;"></p>
+                </div>
+            </div>
+
+            <div id="prediction-section">
+                <h4>Model Prediction:</h4>
+                <p id="predictionText"></p>
+                 </div>
+
+            <div id="geminiSummarySection" style="display: none;"> <h4>Assistant Summary</h4> <div class="gemini-summary-content"> <div id="geminiExplanationBlock" class="gemini-summary-block"> <h4>Explanation</h4>
+                         <p id="geminiExplanation"></p>
+                     </div>
+                     <div class="gemini-example-image-wrapper"> <img id="geminiExampleImage" src="" alt="Example Image" style="display: none;"/> <p id="geminiExampleImageNotFound" style="display: none; color: #e74c3c; font-style: italic; text-align: center;"></p> </div>
+                 </div>
+                 <div id="geminiPrecautionsBlock" class="gemini-summary-block"> <h4>Precautions</h4>
+                     <p id="geminiPrecautions"></p>
+                 </div>
+            </div>
+
+            <div id="xaiSection" style="display: none;">
+                 <h4>Heatmap Visualization (Model Focus)</h4> <div class="xai-content">
+                     <div class="xai-image-wrapper">
+                         <img id="heatmapOverlayImage" src="" alt="Heatmap Overlay" style="display: none;"/>
+                         <p id="heatmapImageNotFound" style="display: none; color: #e74c3c; font-style: italic; text-align: center;"></p>
+                     </div>
+                     <div id="xaiExplanationBlock" class="xai-explanation-block gemini-summary-block"> <h4>Explanation of Heatmap Focus</h4> <p id="xaiExplanationText"></p>
+                     </div>
+                 </div>
+            </div>
+
+
+            <div id="chatbotSection">
+                <h4>Chat with the Assistant about the result</h4> <div id="chatbox">
+                    <div class="chat-message bot-message">
+                        <strong>Bot:</strong> Hello! I can help you understand this diagnosis. Ask me anything about the result.
+                    </div>
+                </div>
+                <div id="chatInputContainer">
+                    <input type="text" id="chatInput" placeholder="Ask about the diagnosis..." />
+                    <button id="sendButton">Send</button>
+                </div>
+            </div>
+
+        </div>
+
+        </div>
+
+    <div class="button-group container">
+         <button type="button" id="printButton" style="display: none;">Print Result</button>
+         <button id="uploadAnotherButton" style="display: none;">Upload Another Image</button>
+    </div>
+
+
+    <footer>
+        <p>&copy; {{ now().year }} Automated Retinal Imaging Project. All rights reserved.</p>
+    </footer>
+
+
+    <script>
+        // *** WRAP ALL YOUR JS CODE INSIDE THIS DOMContentLoaded LISTENER ***
+        // This ensures the script runs only after the entire HTML document is loaded and parsed.
+        document.addEventListener('DOMContentLoaded', function() {
+
+             // --- Debugging Log: Confirm DOMContentLoaded fired ---
+             console.log("--- Simple Test: DOM fully loaded and parsed! ---");
+
+            // --- Get HTML Elements by ID ---
+            // Get references to the necessary HTML elements.
+            // Added checks to ensure elements are found and log errors if not.
+            const uploadForm = document.getElementById('uploadForm');
+            console.log("uploadForm element:", uploadForm); // Debug log for the form element
+
+            const imageInput = document.getElementById('imageInput');
+            const predictButton = document.getElementById('predictButton'); // Original Predict button
+
+            const previewSection = document.getElementById('previewSection');
+            const imagePreview = document.getElementById('imagePreview');
+
+            // Loader and Loading Messages
+            const loaderContainer = document.getElementById('loaderContainer');
+            const loader = document.getElementById('loader');
+            const loadingMessage = document.getElementById('loadingMessage');
+
+
+            const resultsContainer = document.getElementById('resultsContainer');
+            const resultsSection = document.getElementById('resultsSection'); // Content inside resultsContainer
+            const uploadedImage = document.getElementById('uploadedImage');
+            const modifiedImage = document.getElementById('modifiedImage');
+            const modifiedImageNotFound = document.getElementById('modifiedImageNotFound');
+            const predictionText = document.getElementById('predictionText');
+
+            // Removed Prediction Probabilities elements
+
+
+            // Assistant Summary Section (formerly Gemini)
+            const geminiSummarySection = document.getElementById('geminiSummarySection'); // Kept ID for JS
+            const geminiExplanation = document.getElementById('geminiExplanation'); // Kept ID for JS
+            const geminiPrecautions = document.getElementById('geminiPrecautions'); // Kept ID for JS
+            const geminiExampleImage = document.getElementById('geminiExampleImage'); // Kept ID for JS
+            const geminiExampleImageNotFound = document.getElementById('geminiExampleImageNotFound'); // Kept ID for JS
+
+            // Explainable Model (XAI) Elements
+            const xaiSection = document.getElementById('xaiSection');
+            const heatmapOverlayImage = document.getElementById('heatmapOverlayImage');
+            const heatmapImageNotFound = document.getElementById('heatmapImageNotFound');
+            const xaiExplanationText = document.getElementById('xaiExplanationText');
+
+
+            // Removed references to feedback section elements
+
+
+            const chatbotSection = document.getElementById('chatbotSection');
+            const chatbox = document.getElementById('chatbox');
+            const chatInput = document.getElementById('chatInput');
+            const sendButton = document.getElementById('sendButton');
+
+            // Get the button group container and the buttons inside it
+            const buttonGroup = document.querySelector('.button-group'); // Get the new button group div
+            const uploadAnotherButton = document.getElementById('uploadAnotherButton'); // Upload Another button
+            const printButton = document.getElementById('printButton'); // Print Button
+
+            // Removed variables to store current result data for feedback
+
+
+             // --- Debugging Logs: Check if elements were found ---
+             // These logs will tell us if document.getElementById successfully found each element.
+             // The uploadForm check is above for the new log.
+             if (!imageInput) console.error("Error: Input with ID 'imageInput' not found!");
+             if (!predictButton) console.error("Error: Button with ID 'predictButton' not found!");
+             if (!previewSection) console.error("Error: Div with ID 'previewSection' not found!");
+             if (!imagePreview) console.error("Error: Image with ID 'imagePreview' not found!");
+             if (!loaderContainer) console.error("Error: Div with ID 'loaderContainer' not found!"); // Check new loader elements
+             if (!loader) console.error("Error: Div with ID 'loader' not found!"); // Check new loader elements
+             if (!loadingMessage) console.error("Error: Paragraph with ID 'loadingMessage' not found!"); // Check new loader elements
+             if (!resultsContainer) console.error("Error: Div with ID 'resultsContainer' not found!");
+             if (!resultsSection) console.error("Error: Div with ID 'resultsSection' not found!");
+             if (!uploadedImage) console.error("Error: Image with ID 'uploadedImage' not found!");
+             if (!modifiedImage) console.error("Error: Image with ID 'modifiedImage' not found!");
+             if (!modifiedImageNotFound) console.error("Error: Paragraph with ID 'modifiedImageNotFound' not found!");
+             if (!predictionText) console.error("Error: Paragraph with ID 'predictionText' not found!");
+             // Removed check for probabilities elements
+             if (!geminiSummarySection) console.error("Error: Div with ID 'geminiSummarySection' not found!"); // Check new elements
+             if (!geminiExplanation) console.error("Error: Paragraph with ID 'geminiExplanation' not found!"); // Check new elements
+             if (!geminiPrecautions) console.error("Error: Paragraph with ID 'geminiPrecautions' not found!"); // Check new elements
+             if (!geminiExampleImage) console.error("Error: Image with ID 'geminiExampleImage' not found!"); // Check new elements
+             if (!geminiExampleImageNotFound) console.error("Error: Paragraph with ID 'geminiExampleImageNotFound' not found!"); // Check new elements
+             if (!xaiSection) console.error("Error: Div with ID 'xaiSection' not found!"); // Check new elements
+             if (!heatmapOverlayImage) console.error("Error: Image with ID 'heatmapOverlayImage' not found!"); // Check new elements
+             if (!heatmapImageNotFound) console.error("Error: Paragraph with ID 'heatmapImageNotFound' not found!"); // Check new elements
+             if (!xaiExplanationText) console.error("Error: Paragraph with ID 'xaiExplanationText' not found!"); // Check new elements
+             // Removed feedback element checks
+             if (!chatbotSection) console.error("Error: Div with ID 'chatbotSection' not found!");
+             if (!chatbox) console.error("Error: Div with ID 'chatbox' not found!");
+             if (!chatInput) console.error("Error: Input with ID 'chatInput' not found!");
+             if (!sendButton) console.error("Error: Button with ID 'sendButton' not found!");
+             if (!buttonGroup) console.error("Error: Div with class 'button-group' not found!"); // Check new button group
+             if (!uploadAnotherButton) console.error("Error: Button with ID 'uploadAnotherButton' not found!"); // Check button in group
+             if (!printButton) console.error("Error: Button with ID 'printButton' not found!"); // Check button in group
+
+
+            // --- Image Preview Logic ---
+            // Add event listener for file input change to show preview.
+            // Ensure imageInput, previewSection, and imagePreview elements are found before adding the listener.
+            if (imageInput && previewSection && imagePreview) {
+                imageInput.addEventListener('change', function(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        // Check if the file is an image based on its MIME type.
+                        if (file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                imagePreview.src = e.target.result; // Set the image source to the data URL.
+                                previewSection.style.display = 'block'; // Show the preview section.
+                            }
+                            reader.readAsDataURL(file); // Read the file content as a data URL.
+                        } else {
+                            // Handle case where a non-image file is selected.
+                            imagePreview.src = "#"; // Clear the preview image source.
+                            previewSection.style.display = 'none'; // Hide the preview section.
+                            alert('Please select an image file.'); // Alert the user.
+                            imageInput.value = ''; // Clear the file input field.
+                        }
+                    } else {
+                        // Handle case where file selection is cancelled.
+                        imagePreview.src = "#"; // Clear the preview image source.
+                        previewSection.style.display = 'none'; // Hide the preview section.
+                    }
+                });
+            } else {
+                 console.error("Error: Image preview elements (imageInput, previewSection, or imagePreview) not found. Preview feature disabled.");
+            }
+
+
+            // --- Core Prediction Logic Function ---
+            // This function contains the logic to get the file, send the fetch request, and update the UI.
+            // It is called by the Predict button's click listener.
+            async function handlePrediction() {
+                 console.log("Attempting to handle prediction..."); // Debug log for function entry
+
+                const formData = new FormData(); // Create a FormData object to easily handle the file upload.
+                // Get the selected file from the input. Ensure imageInput is found.
+                const imageFile = imageInput ? imageInput.files[0] : null;
+
+
+                if (!imageFile) {
+                    alert('Please select an image file.');
+                    // Ensure buttons and form opacity are reset if no file selected
+                    if(predictButton) predictButton.disabled = false;
+                    if(uploadForm) uploadForm.style.opacity = 1;
+                    return; // Stop the function if no file is selected.
+                }
+
+                formData.append('image', imageFile); // Add the selected image file to the form data.
+
+                // --- UI Updates Before Fetch ---
+                // Disable the predict button and dim the form to indicate processing.
+                // Hide sections that show previous results or preview.
+                // Show the loading spinner and initial loading message.
+                // Ensure relevant elements are found before modifying their styles/properties.
+                if(predictButton) predictButton.disabled = true;
+
+                if(uploadForm) uploadForm.style.opacity = 0.5;
+
+                if(previewSection) previewSection.style.display = 'none';
+                if(resultsContainer) resultsContainer.style.display = 'none';
+                if(buttonGroup) buttonGroup.style.display = 'none'; // Hide button group
+
+                // Show loader and set initial message
+                if(loaderContainer) loaderContainer.style.display = 'flex';
+                if(loadingMessage) loadingMessage.textContent = 'Uploading image...';
+
+
+                 if(geminiSummarySection) geminiSummarySection.style.display = 'none'; // Hide Assistant summary section
+                 if(xaiSection) xaiSection.style.display = 'none'; // Hide XAI section
+                 // Removed hiding probabilities section
+
+
+                // Reset the chatbox to the initial bot message. Ensure chatbox is found.
+                if(chatbox) chatbox.innerHTML = '<div class="chat-message bot-message"><strong>Bot:</strong> Hello! I can help you understand this diagnosis. Ask me anything about the result.</div>';
+
+
+                 // Reset XAI section state
+                 if(heatmapOverlayImage) heatmapOverlayImage.src = "";
+                 if(heatmapOverlayImage) heatmapOverlayImage.style.display = 'none';
+                 if(heatmapImageNotFound) heatmapImageNotFound.innerHTML = "";
+                 if(heatmapImageNotFound) heatmapImageNotFound.style.display = 'none';
+                 if(xaiExplanationText) xaiExplanationText.textContent = "";
+
+                 // Removed clearing probabilities list
+
+
+                // --- Send Data to Flask Backend ---
+                try {
+                    // Update loading message for prediction
+                    if(loadingMessage) loadingMessage.textContent = 'Analyzing image...';
+
+                    // Send the form data (including the image file) to the /predict route.
+                    const response = await fetch('/predict', {
+                        method: 'POST',
+                        body: formData, // Use the FormData object as the body.
+                    });
+
+                    const result = await response.json(); // Parse the JSON response from the server.
+
+                    // --- UI Updates After Fetch (Success or Error) ---
+                    // Hide the loader and re-enable the predict button and restore form opacity.
+                    // Ensure loader, predictButton, and uploadForm are found for these updates.
+                    if(loaderContainer) loaderContainer.style.display = 'none'; // Hide loader container
+                    if(predictButton) predictButton.disabled = false;
+                    if(uploadForm) uploadForm.style.opacity = 1;
+
+
+                    if (response.ok) { // Check if the HTTP status code indicates success (e.g., 200).
+                        // --- Update Results Section with Data ---
+                        // Set the src attributes for the uploaded and modified images.
+                        // Update the prediction text.
+                        // Show the results container and the "Upload Another" button.
+                        // Update the Assistant summary blocks and example image.
+                        // Show the print button.
+                        // Ensure relevant elements are found before updating.
+
+
+                        if(uploadedImage) uploadedImage.src = result.uploaded_image_url;
+
+                        // Handle the Corresponding Modified Image display.
+                        if (result.modified_image_url) {
+                            if(modifiedImage) {
+                                modifiedImage.src = result.modified_image_url;
+                                modifiedImage.style.display = 'block'; // Show the image tag.
+                            }
+                            if(modifiedImageNotFound) modifiedImageNotFound.style.display = 'none'; // Hide the "not found" message.
+                            // Ensure parentElement exists before accessing its style.
+                            if(modifiedImage && modifiedImage.parentElement) modifiedImage.parentElement.style.display = 'flex'; // Show the wrapper flex container.
+                        } else {
+                            // If no modified image URL was returned.
+                            if(modifiedImage) {
+                                modifiedImage.src = ""; // Clear the image source.
+                                modifiedImage.style.display = 'none'; // Hide the image tag.
+                            }
+                            if(modifiedImageNotFound) {
+                                 modifiedImageNotFound.style.display = 'block'; // Show the "not found" message.
+                                 modifiedImageNotFound.innerHTML = 'Corresponding modified image not found.'; // Set the not found text.
+                            }
+                            // Ensure parentElement exists before accessing its style.
+                            if(modifiedImage && modifiedImage.parentElement) modifiedImage.parentElement.style.display = 'flex'; // Still show wrapper to contain the "not found" message.
+                        }
+
+                        // Set the prediction text, allowing HTML (like <br> tags).
+                        if(predictionText) predictionText.innerHTML = result.prediction;
+
+                        // Removed Display probabilities
+
+
+                        // Update and show Assistant summary blocks and example image
+                         if (geminiExplanation && geminiPrecautions && geminiSummarySection && geminiExampleImage && geminiExampleImageNotFound) {
+                             geminiExplanation.innerHTML = result.gemini_explanation;
+                             geminiPrecautions.innerHTML = result.gemini_precautions;
+
+                             if (result.example_image_url) {
+                                 geminiExampleImage.src = result.example_image_url;
+                                 geminiExampleImage.style.display = 'block'; // Show the image
+                                 geminiExampleImageNotFound.style.display = 'none'; // Hide not found message
+                             } else {
+                                 geminiExampleImage.src = ""; // Clear image source
+                                 geminiExampleImage.style.display = 'none'; // Hide the image
+                                 geminiExampleImageNotFound.style.display = 'block'; // Show not found message
+                                 geminiExampleImageNotFound.innerHTML = 'Example image not available for this diagnosis.';
+                             }
+
+                             geminiSummarySection.style.display = 'block'; // Show the Assistant summary section
+
+                         } else {
+                             console.error("Error: Assistant summary or example image elements not found. Summary/Image will not be displayed.");
+                         }
+
+                         // Update and show XAI section
+                         if (xaiSection && heatmapOverlayImage && heatmapImageNotFound && xaiExplanationText) {
+                             if (result.heatmap_overlay_url) {
+                                 heatmapOverlayImage.src = result.heatmap_overlay_url;
+                                 heatmapOverlayImage.style.display = 'block'; // Show the heatmap image
+                                 heatmapImageNotFound.style.display = 'none'; // Hide not found message
+                             } else {
+                                 heatmapOverlayImage.src = ""; // Clear image source
+                                 heatmapOverlayImage.style.display = 'none'; // Hide the image
+                                 heatmapImageNotFound.style.display = 'block'; // Show not found message
+                                 heatmapImageNotFound.innerHTML = 'Heatmap could not be generated.';
+                             }
+                             xaiExplanationText.textContent = result.xai_explanation; // Set XAI explanation text
+                             xaiSection.style.display = 'block'; // Show the XAI section
+                         } else {
+                             console.error("Error: XAI elements not found. XAI section will not be displayed.");
+                         }
+
+
+                        // Show the results container and trigger its animation. Ensure resultsContainer is found.
+                        if(resultsContainer) {
+                            resultsContainer.style.display = 'block';
+                             // Trigger animation by resetting opacity/transform and then setting them back after a small delay.
+                            resultsContainer.style.opacity = 0;
+                            resultsContainer.style.transform = 'translateY(15px)';
+                            setTimeout(() => {
+                                resultsContainer.style.opacity = 1;
+                                resultsContainer.style.transform = 'translateY(0)';
+                            }, 50); // Small delay to allow the browser to apply the initial state before animating.
+                        }
+
+                        // Show the button group container and the buttons inside it
+                        if(buttonGroup) buttonGroup.style.display = 'flex'; // Use flex to center buttons
+                        if(uploadAnotherButton) uploadAnotherButton.style.display = 'block';
+                        if(printButton) printButton.style.display = 'block';
+
+
+                    } else { // Handle cases where the server returned an error status (e.g., 400, 500).
+                        // Display an alert with the error message from the server response.
+                        alert('Error during prediction: ' + (result.error || 'Unknown error'));
+                        // Show the upload form again. Ensure uploadForm is found.
+                        if(uploadForm) uploadForm.style.display = 'flex';
+                        // Clear the file input field. Ensure imageInput is found.
+                        if(imageInput) imageInput.value = '';
+                    }
+
+                } catch (error) { // Handle network errors or errors during the fetch process itself.
+                    console.error('Fetch error:', error); // Log the detailed error.
+
+                    // Hide loader, re-enable button, restore form opacity. Ensure elements are found.
+                    if(loaderContainer) loaderContainer.style.display = 'none'; // Hide loader container
+                    if(predictButton) predictButton.disabled = false;
+                    if(uploadForm) uploadForm.style.opacity = 1;
+
+                    // Display a generic error message to the user.
+                    alert('An error occurred: ' + error.message);
+
+                     // Show the upload form again and clear the file input. Ensure elements are found.
+                    if(uploadForm) uploadForm.style.display = 'flex';
+                    if(imageInput) imageInput.value = '';
+                } finally {
+                    // This block runs regardless of whether the try or catch block finished.
+                    // Ensure button and form opacity are reset in all cases.
+                    if(predictButton) predictButton.disabled = false;
+                    if(uploadForm) uploadForm.style.opacity = 1;
+                }
+            }
+
+
+            // --- Event Listeners ---
+            // Add event listener for the original Predict button click.
+            // Ensure the predictButton element is found before adding the listener.
+            if (predictButton) {
+                 predictButton.addEventListener('click', async () => { // Using click listener
+                    console.log("Predict button clicked!"); // Debugging log.
+                    handlePrediction(); // Call the core prediction logic function.
+                 });
+            } else {
+                 console.error("Error: Original Predict button with ID 'predictButton' not found! Prediction disabled.");
+            }
+
+
+            // Helper function to append messages to the chatbox
+            function appendMessage(sender, message) {
+                 // Ensure the chatbox element is found before trying to append messages.
+                if (!chatbox) {
+                    console.error("Error: Chatbox element not found! Cannot append message.");
+                    return; // Stop the function if chatbox is not found.
+                }
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('chat-message');
+                messageElement.classList.add(sender + '-message'); // Add class for styling (user-message or bot-message).
+
+                // Process the message text for basic formatting (bold, italic) and newlines.
+                let formattedMessage = message;
+                 // Replace *text* with <strong>text</strong>
+                formattedMessage = formattedMessage.replace(/\\(.?)\\*/g, '<strong>$1</strong>');
+                // Replace text with text
+                formattedMessage = formattedMessage.replace(/\(.?)\*/g, '<em>$1</em>');
+                // Convert newline characters (\n) with HTML break tags (<br>) for display.
+                formattedMessage = formattedMessage.replace(/\n/g, '<br>');
+
+                // Set the innerHTML of the message element, including sender name.
+                messageElement.innerHTML = <strong>${sender === 'user' ? 'You' : 'Bot'}:</strong> ${formattedMessage};
+                chatbox.appendChild(messageElement); // Add the new message element to the chatbox.
+                chatbox.scrollTop = chatbox.scrollHeight; // Scroll the chatbox to the bottom to show the latest message.
+            }
+
+            // Handle chatbot send button click or Enter key press
+            async function sendMessage() {
+                 // Ensure chatInput and sendButton elements are found.
+                 if (!chatInput || !sendButton) {
+                     console.error("Error: Chat input or send button not found! Cannot send message.");
+                     return; // Stop the function if elements are not found.
+                 }
+                const userMessage = chatInput.value.trim(); // Get the message from the input field and remove leading/trailing whitespace.
+                if (userMessage === '') {
+                    return; // Do nothing if the message is empty.
+                }
+
+                // Append the user's message to the chatbox immediately.
+                appendMessage('user', userMessage);
+                chatInput.value = ''; // Clear the input field after sending.
+                sendButton.disabled = true; // Disable the send button while waiting for a response.
+
+                // Optional: Add a loading indicator in the chatbox while waiting for bot response
+                 // (You could append a temporary message like "Bot is thinking..." using appendMessage)
+
+                // --- Send Message to Flask Backend ---
+                try {
+                    // Send the user message as JSON to the /chatbot route.
+                    const response = await fetch('/chatbot', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json', // Specify that we are sending JSON data.
+                        },
+                        body: JSON.stringify({ message: userMessage }), // Convert the message object to a JSON string.
+                    });
+
+                    const result = await response.json(); // Parse the JSON response from the server.
+
+                    if (response.ok) { // Check if the HTTP status code indicates success.
+                        // Append the bot's response to the chatbox.
+                        appendMessage('bot', result.response);
+                    } else { // Handle cases where the server returned an error status.
+                         console.error('Chatbot error response:', result.response); // Log the error details.
+                        // Display an error message in the chatbox.
+                        appendMessage('bot', 'Error from chatbot: ' + (result.response || 'Unknown error'));
+                    }
+
+                } catch (error) { // Handle network errors or errors during the fetch process.
+                    console.error('Chatbot fetch error:', error); // Log the detailed error.
+                    // Display a generic error message in the chatbox.
+                    appendMessage('bot', 'An error occurred while contacting the chatbot.');
+                } finally {
+                    // This block runs regardless of whether the try or catch block finished.
+                    // Re-enable the send button.
+                    sendButton.disabled = false;
+                }
+            }
+
+            // Add event listeners to the send button and the chat input field (for Enter key).
+            // Ensure sendButton and chatInput elements are found before adding listeners.
+             if (sendButton && chatInput) {
+                sendButton.addEventListener('click', sendMessage);
+
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault(); // Prevent the default action (adding a newline in the input field).
+                        sendMessage(); // Call the sendMessage function.
+                    }
+                });
+             } else {
+                 console.error("Error: Chat elements (sendButton or chatInput) not found! Chat functionality may be limited.");
+             }
+
+
+             // Handle "Upload Another Image" button click
+             // Ensure uploadAnotherButton is found
+             if (uploadAnotherButton) {
+                 uploadAnotherButton.addEventListener('click', () => {
+                     // Reset the UI to the initial state: show the form, hide results and preview.
+                     // Clear the file input and reset the chatbox.
+                     // Clear image sources and the "not found" message.
+                     // Hide Assistant summary, feedback, and print button group.
+                     // Reset feedback section state
+                     // Ensure relevant elements are found before modifying them.
+                     if(uploadForm) uploadForm.style.display = 'flex';
+                     if(resultsContainer) resultsContainer.style.display = 'none';
+                     if(previewSection) previewSection.style.display = 'none';
+                     if(buttonGroup) buttonGroup.style.display = 'none'; // Hide the button group
+                     if(xaiSection) xaiSection.style.display = 'none'; // Hide XAI section
+                     if(imageInput) imageInput.value = ''; // Clear the selected file.
+                     if(chatbox) chatbox.innerHTML = '<div class="chat-message bot-message"><strong>Bot:</strong> Hello! I can help you understand this diagnosis. Ask me anything about the result.</div>'; // Reset chatbox content.
+                      // Clear the image sources and the "not found" message text.
+                     if(uploadedImage) uploadedImage.src = "";
+                     if(modifiedImage) modifiedImage.src = "";
+                     if(modifiedImageNotFound) modifiedImageNotFound.innerHTML = "";
+                     if(geminiSummarySection) geminiSummarySection.style.display = 'none'; // Hide Assistant summary
+                      // Clear and hide example image
+                     if(geminiExampleImage) geminiExampleImage.src = "";
+                     if(geminiExampleImage) geminiExampleImage.style.display = 'none';
+                     if(geminiExampleImageNotFound) geminiExampleImageNotFound.innerHTML = "";
+
+                     // Reset XAI section state
+                     if(heatmapOverlayImage) heatmapOverlayImage.src = "";
+                     if(heatmapOverlayImage) heatmapOverlayImage.style.display = 'none';
+                     if(heatmapImageNotFound) heatmapImageNotFound.innerHTML = "";
+                     if(heatmapImageNotFound) heatmapImageNotFound.style.display = 'none';
+                     if(xaiExplanationText) xaiExplanationText.textContent = "";
+
+                     // Removed hiding and clearing probabilities
+
+                 });
+             } else {
+                  console.error("Error: 'Upload Another Image' button not found! Reset functionality may be limited.");
+             }
+
+            // --- Handle Print Button Click (Native Browser Print) ---
+            // Ensure printButton is found before adding the listener
+            if (printButton) {
+                printButton.addEventListener('click', () => {
+                    console.log("Print button clicked! Triggering native print dialog.");
+
+                    // Add a class to the body to apply print-specific styles from CSS
+                    document.body.classList.add('printing');
+
+                    // Use a small timeout to ensure the CSS changes are applied before printing
+                    setTimeout(() => {
+                        window.print(); // Trigger the native browser print dialog
+
+                        // Remove the printing class after the print dialog is closed or cancelled
+                        // The 'afterprint' event is the standard way to handle this
+                        window.addEventListener('afterprint', () => {
+                            document.body.classList.remove('printing');
+                            console.log("Printing finished, restoring page view.");
+                        }, { once: true }); // Use { once: true } to automatically remove the listener after it runs once
+
+                    }, 50); // Small delay to allow CSS to apply
+                });
+            } else {
+                console.error("Error: Print button with ID 'printButton' not found! Print functionality disabled.");
+            }
+
+            // Removed Handle Feedback Button Clicks section
+
+
+             // --- Initial State Setup on Page Load ---
+             // Set the initial display state for sections that should be hidden when the page loads.
+             // Ensure resultsContainer, previewSection, uploadAnotherButton, geminiSummarySection, and printButton are found.
+             if(resultsContainer) resultsContainer.style.display = 'none'; // Hide the results container initially.
+             if(previewSection) previewSection.style.display = 'none'; // Hide the image preview section initially.
+             // Hide the button group initially
+             if(buttonGroup) buttonGroup.style.display = 'none';
+             if(geminiSummarySection) geminiSummarySection.style.display = 'none'; // Hide Assistant summary section initially.
+             if(xaiSection) xaiSection.style.display = 'none'; // Hide XAI section initially.
+             // Removed hiding probabilities section initially
+
+
+        }); // <-- End of DOMContentLoaded listener function.
+    </script>
+</body>
+</html>
